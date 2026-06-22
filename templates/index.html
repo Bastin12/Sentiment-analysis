@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kindle Review Sentiment Analyzer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,600;1,9..144,500&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #f3ecdd;
+    --paper-dark: #e8dcc3;
+    --ink: #2b2420;
+    --ink-soft: #5c5247;
+    --cover: #3c2f2f;
+    --gold: #a9792f;
+    --pos: #3f6e4f;
+    --pos-bg: #e3ecdf;
+    --neg: #9a3b32;
+    --neg-bg: #f3e1dc;
+    --rule: #c9bb9d;
+  }
+
+  *{ box-sizing: border-box; }
+
+  body{
+    margin:0;
+    background: var(--paper);
+    background-image:
+      radial-gradient(ellipse at top left, rgba(169,121,47,0.06), transparent 50%),
+      radial-gradient(ellipse at bottom right, rgba(60,47,47,0.05), transparent 50%);
+    color: var(--ink);
+    font-family: 'Source Sans 3', sans-serif;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page{
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 56px 24px 80px;
+  }
+
+  /* ---------- Header / spine ---------- */
+  .masthead{
+    display:flex;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 6px;
+  }
+  .spine{
+    width: 14px;
+    height: 64px;
+    background: linear-gradient(180deg, var(--cover), #2a2020);
+    border-radius: 2px;
+    box-shadow: inset -2px 0 0 rgba(255,255,255,0.08);
+    flex-shrink: 0;
+  }
+  h1{
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: clamp(28px, 5vw, 40px);
+    line-height: 1.1;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .eyebrow{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--gold);
+    margin: 0 0 6px;
+  }
+  .subtitle{
+    font-size: 16px;
+    color: var(--ink-soft);
+    max-width: 540px;
+    margin: 14px 0 0;
+    line-height: 1.55;
+  }
+
+  .rule{
+    border: none;
+    border-top: 1px solid var(--rule);
+    margin: 36px 0;
+  }
+
+  /* ---------- Form ---------- */
+  .form-card{
+    background: var(--paper-dark);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 28px 28px 24px;
+    position: relative;
+  }
+  .form-card::before{
+    content: "";
+    position: absolute;
+    left: -1px; top: 18px; bottom: 18px;
+    width: 3px;
+    background: var(--gold);
+    border-radius: 2px;
+    opacity: 0.55;
+  }
+  label.field-label{
+    display:block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-soft);
+    margin-bottom: 10px;
+  }
+  textarea{
+    width: 100%;
+    min-height: 130px;
+    resize: vertical;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 14px 16px;
+    font-family: 'Source Sans 3', sans-serif;
+    font-size: 15.5px;
+    line-height: 1.6;
+    color: var(--ink);
+  }
+  textarea:focus{
+    outline: none;
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(169,121,47,0.15);
+  }
+  textarea::placeholder{ color: #998d7c; }
+
+  .form-footer{
+    display:flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .hint{
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+
+  button.analyze{
+    background: var(--cover);
+    color: var(--paper);
+    border: none;
+    font-family: 'Source Sans 3', sans-serif;
+    font-weight: 600;
+    font-size: 15px;
+    padding: 12px 26px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: transform 0.12s ease, background 0.15s ease;
+    letter-spacing: 0.01em;
+  }
+  button.analyze:hover{ background: #2a2020; transform: translateY(-1px); }
+  button.analyze:active{ transform: translateY(0); }
+  button.analyze:focus-visible{ outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  /* ---------- Sample chips ---------- */
+  .samples{
+    display:flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 18px;
+  }
+  .chip{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  .chip:hover{ border-color: var(--gold); color: var(--ink); }
+
+  /* ---------- Results ---------- */
+  .results{
+    margin-top: 36px;
+  }
+  .results-label{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-soft);
+    margin: 0 0 14px;
+  }
+  .verdict-grid{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 560px){
+    .verdict-grid{ grid-template-columns: 1fr; }
+  }
+  .verdict-card{
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 20px;
+    background: var(--paper-dark);
+    position: relative;
+    overflow: hidden;
+  }
+  .verdict-card.positive{ border-color: var(--pos); }
+  .verdict-card.negative{ border-color: var(--neg); }
+
+  .model-name{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-soft);
+    margin: 0 0 12px;
+  }
+  .verdict-word{
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-weight: 500;
+    font-size: 26px;
+    margin: 0 0 14px;
+  }
+  .verdict-card.positive .verdict-word{ color: var(--pos); }
+  .verdict-card.negative .verdict-word{ color: var(--neg); }
+
+  .confidence-row{
+    display:flex;
+    align-items:center;
+    gap: 10px;
+  }
+  .confidence-track{
+    flex: 1;
+    height: 6px;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .confidence-fill{
+    height: 100%;
+    border-radius: 999px;
+  }
+  .verdict-card.positive .confidence-fill{ background: var(--pos); }
+  .verdict-card.negative .confidence-fill{ background: var(--neg); }
+  .confidence-num{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    min-width: 42px;
+    text-align: right;
+  }
+
+  .cleaned-block{
+    margin-top: 28px;
+  }
+  .cleaned-text{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    background: var(--paper-dark);
+    border: 1px dashed var(--rule);
+    border-radius: 4px;
+    padding: 14px 16px;
+    line-height: 1.6;
+    word-break: break-word;
+  }
+
+  /* ---------- Footer / pipeline note ---------- */
+  .pipeline{
+    margin-top: 56px;
+    font-size: 13px;
+    color: var(--ink-soft);
+    line-height: 1.7;
+  }
+  .pipeline strong{ color: var(--ink); }
+  .steps{
+    display:flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .step{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    background: var(--paper-dark);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 5px 10px;
+    color: var(--ink-soft);
+  }
+
+  footer.colophon{
+    margin-top: 48px;
+    padding-top: 20px;
+    border-top: 1px solid var(--rule);
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    display:flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  footer.colophon a{ color: var(--gold); text-decoration: none; }
+  footer.colophon a:hover{ text-decoration: underline; }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition: none !important; }
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+
+    <div class="masthead">
+      <div class="spine" aria-hidden="true"></div>
+      <div>
+        <p class="eyebrow">NLP &middot; Naive Bayes &middot; BOW vs TF&#8209;IDF</p>
+        <h1>Kindle Review<br>Sentiment Analyzer</h1>
+      </div>
+    </div>
+    <p class="subtitle">
+      Drop in a book review and two Naive&nbsp;Bayes classifiers — one trained on
+      Bag&nbsp;of&nbsp;Words, one on TF&#8209;IDF — each give their verdict: would a reader
+      call this a thumbs up or down?
+    </p>
+
+    <hr class="rule">
+
+    <form method="POST" action="/" id="reviewForm">
+      <div class="form-card">
+        <label class="field-label" for="review_text">Paste a review</label>
+        <textarea
+          id="review_text"
+          name="review_text"
+          placeholder="e.g. I couldn't put this book down — the pacing was perfect and the ending caught me completely off guard..."
+        >{{ review_text }}</textarea>
+
+        <div class="form-footer">
+          <span class="hint">Cleaned the same way as training: lowercased, stripped, lemmatized.</span>
+          <button class="analyze" type="submit">Analyze review</button>
+        </div>
+
+        <div class="samples">
+          <span class="chip" data-sample="This was the best book I have read all year, I couldn't put it down and the characters felt so real.">+ glowing review</span>
+          <span class="chip" data-sample="Honestly a waste of time. The plot made no sense and I skipped to the end just to be done with it.">+ scathing review</span>
+          <span class="chip" data-sample="It was fine. Some parts dragged but the ending picked up the pace a little.">+ mixed review</span>
+        </div>
+      </div>
+    </form>
+
+    {% if result %}
+    <div class="results">
+      <p class="results-label">Verdict</p>
+      <div class="verdict-grid">
+
+        <div class="verdict-card {{ 'positive' if result.bow.label == 'Positive' else 'negative' }}">
+          <p class="model-name">Bag of Words + Naive Bayes</p>
+          <p class="verdict-word">{{ result.bow.label }}</p>
+          <div class="confidence-row">
+            <div class="confidence-track">
+              <div class="confidence-fill" style="width: {{ result.bow.confidence }}%;"></div>
+            </div>
+            <span class="confidence-num">{{ result.bow.confidence }}%</span>
+          </div>
+        </div>
+
+        <div class="verdict-card {{ 'positive' if result.tfidf.label == 'Positive' else 'negative' }}">
+          <p class="model-name">TF&#8209;IDF + Naive Bayes</p>
+          <p class="verdict-word">{{ result.tfidf.label }}</p>
+          <div class="confidence-row">
+            <div class="confidence-track">
+              <div class="confidence-fill" style="width: {{ result.tfidf.confidence }}%;"></div>
+            </div>
+            <span class="confidence-num">{{ result.tfidf.confidence }}%</span>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="cleaned-block">
+        <p class="results-label">After preprocessing</p>
+        <div class="cleaned-text">{{ result.cleaned_text if result.cleaned_text else "(nothing left after cleaning — try a longer review)" }}</div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="pipeline">
+      <strong>How this works:</strong> every review passes through the exact cleaning
+      pipeline used during training before either model sees it.
+      <div class="steps">
+        <span class="step">lowercase</span>
+        <span class="step">strip special chars</span>
+        <span class="step">remove stopwords</span>
+        <span class="step">strip URLs &amp; HTML</span>
+        <span class="step">lemmatize</span>
+        <span class="step">vectorize (BOW / TF&#8209;IDF)</span>
+        <span class="step">GaussianNB predict</span>
+      </div>
+    </div>
+
+    <footer class="colophon">
+      <span>Trained on the Kindle book review dataset (12,000 reviews).</span>
+      <a href="https://github.com/" target="_blank" rel="noopener">View source on GitHub →</a>
+    </footer>
+
+  </div>
+
+  <script>
+    document.querySelectorAll('.chip').forEach(function(chip){
+      chip.addEventListener('click', function(){
+        document.getElementById('review_text').value = chip.getAttribute('data-sample');
+        document.getElementById('review_text').focus();
+      });
+    });
+  </script>
+</body>
+</html>
